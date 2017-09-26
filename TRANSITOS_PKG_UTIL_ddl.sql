@@ -6,7 +6,8 @@ IS
 
     FUNCTION asigna_tecnico (prm_sad_reg_year   IN VARCHAR2,
                              prm_key_cuo        IN VARCHAR2,
-                             prm_sad_reg_nber   IN VARCHAR2)
+                             prm_sad_reg_nber   IN VARCHAR2,
+                             prm_usuario        IN VARCHAR2)
         RETURN INTEGER;
 
     FUNCTION verifica_pastogrande (prm_car_reg_year   IN VARCHAR2,
@@ -40,16 +41,24 @@ END;
 
 CREATE OR REPLACE 
 PACKAGE BODY pkg_util
-/* Formatted on 25-sep.-2017 18:26:36 (QP5 v5.126) */
+/* Formatted on 26-sep.-2017 12:16:47 (QP5 v5.126) */
 IS
     FUNCTION asigna_tecnico (prm_sad_reg_year   IN VARCHAR2,
                              prm_key_cuo        IN VARCHAR2,
-                             prm_sad_reg_nber   IN VARCHAR2)
+                             prm_sad_reg_nber   IN VARCHAR2,
+                             prm_usuario        IN VARCHAR2)
         RETURN INTEGER
     IS
         v_res   INTEGER;
     BEGIN
         --ASIGNA TECNICO DE ADUANA
+        INSERT INTO tra_pastogrande
+          VALUES   (prm_sad_reg_year,
+                    prm_key_cuo,
+                    prm_sad_reg_nber,
+                    prm_usuario,
+                    SYSDATE);
+
         v_res := 0;
         RETURN v_res;
     END;
