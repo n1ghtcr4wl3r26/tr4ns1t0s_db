@@ -1,13 +1,14 @@
 CREATE OR REPLACE 
 PACKAGE pkg_util
-/* Formatted on 25-sep.-2017 18:16:15 (QP5 v5.126) */
+/* Formatted on 27-sep.-2017 18:11:39 (QP5 v5.126) */
 IS
     TYPE cursortype IS REF CURSOR;
 
-    FUNCTION asigna_tecnico (prm_sad_reg_year   IN VARCHAR2,
-                             prm_key_cuo        IN VARCHAR2,
-                             prm_sad_reg_nber   IN VARCHAR2,
-                             prm_usuario        IN VARCHAR2)
+    FUNCTION asigna_tecnico (prm_key_year   IN VARCHAR2,
+                             prm_key_cuo    IN VARCHAR2,
+                             prm_key_dec    IN VARCHAR2,
+                             prm_key_nber   IN VARCHAR2,
+                             prm_usuario    IN VARCHAR2)
         RETURN INTEGER;
 
     FUNCTION verifica_pastogrande (prm_car_reg_year   IN VARCHAR2,
@@ -41,23 +42,25 @@ END;
 
 CREATE OR REPLACE 
 PACKAGE BODY pkg_util
-/* Formatted on 26-sep.-2017 12:16:47 (QP5 v5.126) */
+/* Formatted on 27-sep.-2017 18:11:36 (QP5 v5.126) */
 IS
-    FUNCTION asigna_tecnico (prm_sad_reg_year   IN VARCHAR2,
-                             prm_key_cuo        IN VARCHAR2,
-                             prm_sad_reg_nber   IN VARCHAR2,
-                             prm_usuario        IN VARCHAR2)
+    FUNCTION asigna_tecnico (prm_key_year   IN VARCHAR2,
+                             prm_key_cuo    IN VARCHAR2,
+                             prm_key_dec    IN VARCHAR2,
+                             prm_key_nber   IN VARCHAR2,
+                             prm_usuario    IN VARCHAR2)
         RETURN INTEGER
     IS
         v_res   INTEGER;
     BEGIN
         --ASIGNA TECNICO DE ADUANA
         INSERT INTO tra_pastogrande
-          VALUES   (prm_sad_reg_year,
+          VALUES   (prm_usuario,
+                    SYSDATE,
+                    prm_key_year,
                     prm_key_cuo,
-                    prm_sad_reg_nber,
-                    prm_usuario,
-                    SYSDATE);
+                    prm_key_dec,
+                    prm_key_nber);
 
         v_res := 0;
         RETURN v_res;
