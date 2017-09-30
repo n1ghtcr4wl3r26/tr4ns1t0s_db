@@ -4,6 +4,27 @@ PACKAGE pkg_util
 IS
     TYPE cursortype IS REF CURSOR;
 
+    FUNCTION programacion_aforo (prm_key_year     IN VARCHAR2,
+                                 prm_key_cuo      IN VARCHAR2,
+                                 prm_key_dec      IN VARCHAR2,
+                                 prm_key_nber     IN VARCHAR2,
+                                 prm_fec_cierre   IN VARCHAR2)
+        RETURN VARCHAR2;
+
+    FUNCTION asigna_tecnico_analista (prm_key_year   IN VARCHAR2,
+                                      prm_key_cuo    IN VARCHAR2,
+                                      prm_key_dec    IN VARCHAR2,
+                                      prm_key_nber   IN VARCHAR2,
+                                      prm_usuario    IN VARCHAR2)
+        RETURN VARCHAR2;
+
+    FUNCTION asigna_tecnico_aforador (prm_key_year   IN VARCHAR2,
+                                      prm_key_cuo    IN VARCHAR2,
+                                      prm_key_dec    IN VARCHAR2,
+                                      prm_key_nber   IN VARCHAR2,
+                                      prm_usuario    IN VARCHAR2)
+        RETURN VARCHAR2;
+
     FUNCTION comparacion_precios (prm_key_year   IN VARCHAR2,
                                   prm_key_cuo    IN VARCHAR2,
                                   prm_key_dec    IN VARCHAR2,
@@ -42,8 +63,41 @@ END;
 
 CREATE OR REPLACE 
 PACKAGE BODY pkg_util
-/* Formatted on 28-sep.-2017 18:12:03 (QP5 v5.126) */
+/* Formatted on 29/09/2017 17:15:14 (QP5 v5.126) */
 IS
+    FUNCTION programacion_aforo (prm_key_year     IN VARCHAR2,
+                                 prm_key_cuo      IN VARCHAR2,
+                                 prm_key_dec      IN VARCHAR2,
+                                 prm_key_nber     IN VARCHAR2,
+                                 prm_fec_cierre   IN VARCHAR2)
+        RETURN VARCHAR2
+    IS
+        v_res   INTEGER;
+        res     VARCHAR2 (300);
+    BEGIN
+        --Proceso MIRA para programacion de aforo.
+        res :=
+            mira.pkg_analista.g_aforo_mem (prm_key_year,
+                                           prm_key_cuo,
+                                           prm_key_dec,
+                                           prm_key_nber,
+                                           prm_fec_cierre);
+
+        INSERT INTO tra_pastogrande
+          VALUES   (prm_key_year,
+                    prm_key_cuo,
+                    prm_key_dec,
+                    prm_key_nber,
+                    'PROGRAMACION AFORO',
+                    res,
+                    prm_fec_cierre,
+                    SYSDATE);
+
+        COMMIT;
+        v_res := 0;
+        RETURN res;
+    END;
+
     FUNCTION comparacion_precios (prm_key_year   IN VARCHAR2,
                                   prm_key_cuo    IN VARCHAR2,
                                   prm_key_dec    IN VARCHAR2,
@@ -63,13 +117,16 @@ IS
                                            prm_usuario);
 
         INSERT INTO tra_pastogrande
-          VALUES   ('COMPARACION PRECIOS' || res,
-                    SYSDATE,
-                    prm_key_year,
+          VALUES   (prm_key_year,
                     prm_key_cuo,
                     prm_key_dec,
-                    prm_key_nber);
+                    prm_key_nber,
+                    'COMPARACION PRECIOS',
+                    res,
+                    prm_usuario,
+                    SYSDATE);
 
+        COMMIT;
         v_res := 0;
         RETURN v_res;
     END;
@@ -79,21 +136,35 @@ IS
                                       prm_key_dec    IN VARCHAR2,
                                       prm_key_nber   IN VARCHAR2,
                                       prm_usuario    IN VARCHAR2)
-        RETURN INTEGER
+        RETURN VARCHAR2
     IS
-        v_res      INTEGER;
+        v_res      VARCHAR2 (30);
         acant      NUMBER;
-        kusr_ex1   VARCHAR2 (30);
+        kusr_ex1   VARCHAR2 (30) := '';
         kusr_ex2   VARCHAR2 (30);
         desc1      VARCHAR2 (30);
         desc2      VARCHAR2 (30);
 
-        ksec_cod   VARCHAR2 (30);
-        kclr       VARCHAR2 (30);
+        ksec_cod   VARCHAR2 (30) := 'V02-402';
+        kclr       VARCHAR2 (30) := '3';
         citems     NUMBER;
+        paso       VARCHAR2 (30);
     BEGIN
+        paso := '1';
+
+        SELECT   a.sad_itm_total
+          INTO   citems
+          FROM   ops$asy.sad_gen a
+         WHERE       key_year = prm_key_year
+                 AND key_cuo = prm_key_cuo
+                 AND key_dec = prm_key_dec
+                 AND key_nber = prm_key_nber
+                 AND a.sad_num = 0;
+
         --ASIGNA TECNICO DE ADUANA
         ------- VERIFICAR SI YA TIENE ASIGNACION DE VISTA -------
+        paso := '2';
+
         SELECT   COUNT (1)
           INTO   acant
           FROM   ops$asy.sad_spy
@@ -103,6 +174,8 @@ IS
                  AND key_nber = prm_key_nber
                  AND spy_sta = '10'
                  AND spy_act = '76';
+
+        paso := '3-' || acant;
 
         IF acant > 0
         THEN
@@ -127,6 +200,8 @@ IS
                                   AND a.usr_sta = 1
                                   AND a.usr_typ = 1);
 
+        paso := '4-' || kusr_ex1;
+
         SELECT   usr_nam
           INTO   kusr_ex2
           FROM   ops$asy.sec_usr b
@@ -142,6 +217,8 @@ IS
                                   AND a.sec_cod = ksec_cod
                                   AND a.usr_sta = 1
                                   AND a.usr_typ = 2);
+
+        paso := '5-' || kusr_ex2;
 
         --- INSERT EN LA SAD_SPY
         INSERT INTO ops$asy.sad_spy
@@ -164,11 +241,14 @@ IS
                     -1);
 
         ---- DESCUENTO DE LA CARGA DE TRABAJO ----------
+        paso := '6-';
 
         SELECT   dec_wgt, itm_wgt
           INTO   desc1, desc2
           FROM   ops$asy.sel_prm
          WHERE   cuo_cod = prm_key_cuo AND sel_flw = 1;
+
+        paso := '7-' || desc1 || '-' || desc2;
 
         UPDATE   ops$asy.sec_usr a
            SET   a.usr_wrk = usr_wrk + (desc1 + desc2 * citems),
@@ -178,6 +258,7 @@ IS
                  AND a.sec_cod = ksec_cod
                  AND a.usr_nam = kusr_ex1;
 
+        paso := '8-';
 
         UPDATE   ops$asy.sec_usr a
            SET   a.usr_wrk = usr_wrk + (desc1 + desc2 * citems),
@@ -188,17 +269,37 @@ IS
                  AND a.usr_nam = kusr_ex2;
 
 
+        paso := '9-';
 
         INSERT INTO tra_pastogrande
-          VALUES   (prm_usuario,
-                    SYSDATE,
-                    prm_key_year,
+          VALUES   (prm_key_year,
                     prm_key_cuo,
                     prm_key_dec,
-                    prm_key_nber);
+                    prm_key_nber,
+                    'SORTEA TECNICO ANALISTA',
+                    kusr_ex1,
+                    prm_usuario,
+                    SYSDATE);
 
-        v_res := 0;
-        RETURN v_res;
+        COMMIT;
+        RETURN kusr_ex1;
+    EXCEPTION
+        WHEN OTHERS
+        THEN
+            ROLLBACK;
+
+            INSERT INTO tra_pastogrande
+              VALUES   (prm_key_year,
+                        prm_key_cuo,
+                        prm_key_dec,
+                        prm_key_nber,
+                        'SORTEA TECNICO ANALISTA',
+                        'ERROR-' || paso,
+                        prm_usuario,
+                        SYSDATE);
+
+            COMMIT;
+            RETURN 1;
     END;
 
     FUNCTION asigna_tecnico_aforador (prm_key_year   IN VARCHAR2,
@@ -206,21 +307,172 @@ IS
                                       prm_key_dec    IN VARCHAR2,
                                       prm_key_nber   IN VARCHAR2,
                                       prm_usuario    IN VARCHAR2)
-        RETURN INTEGER
+        RETURN VARCHAR2
     IS
-        v_res   INTEGER;
+        v_res      VARCHAR2 (30);
+        acant      NUMBER;
+        kusr_ex1   VARCHAR2 (30) := '';
+        kusr_ex2   VARCHAR2 (30);
+        desc1      VARCHAR2 (30);
+        desc2      VARCHAR2 (30);
+
+        ksec_cod   VARCHAR2 (30) := 'S02-402';
+        kclr       VARCHAR2 (30) := '3';
+        citems     NUMBER;
+        paso       VARCHAR2 (30);
     BEGIN
+        paso := '1';
+
+        SELECT   a.sad_itm_total
+          INTO   citems
+          FROM   ops$asy.sad_gen a
+         WHERE       key_year = prm_key_year
+                 AND key_cuo = prm_key_cuo
+                 AND key_dec = prm_key_dec
+                 AND key_nber = prm_key_nber
+                 AND a.sad_num = 0;
+
         --ASIGNA TECNICO DE ADUANA
-        INSERT INTO tra_pastogrande
-          VALUES   (prm_usuario,
-                    SYSDATE,
-                    prm_key_year,
+        ------- VERIFICAR SI YA TIENE ASIGNACION DE VISTA -------
+        paso := '2';
+
+        SELECT   COUNT (1)
+          INTO   acant
+          FROM   ops$asy.sad_spy
+         WHERE       key_year = prm_key_year
+                 AND key_cuo = prm_key_cuo
+                 AND key_dec = prm_key_dec
+                 AND key_nber = prm_key_nber
+                 AND spy_sta = '10'
+                 AND spy_act = '76';
+
+        paso := '3-' || acant;
+
+        IF acant > 0
+        THEN
+            RETURN 0;
+        END IF;
+
+        ------- OBTENER LOS DATOS DEL USR_EX1 Y USR_EX2 -------
+
+        SELECT   usr_nam
+          INTO   kusr_ex1
+          FROM   ops$asy.sec_usr b
+         WHERE       b.cuo_cod = prm_key_cuo
+                 AND b.sec_cod = ksec_cod
+                 AND b.usr_sta = 1
+                 AND b.usr_typ = 1
+                 AND ROWNUM = 1
+                 AND (b.usr_nbd + b.usr_wrk) =
+                        (SELECT   MIN (usr_nbd + usr_wrk)
+                           FROM   ops$asy.sec_usr a
+                          WHERE       a.cuo_cod = prm_key_cuo
+                                  AND a.sec_cod = ksec_cod
+                                  AND a.usr_sta = 1
+                                  AND a.usr_typ = 1);
+
+        paso := '4-' || kusr_ex1;
+
+        SELECT   usr_nam
+          INTO   kusr_ex2
+          FROM   ops$asy.sec_usr b
+         WHERE       b.cuo_cod = prm_key_cuo
+                 AND b.sec_cod = ksec_cod
+                 AND b.usr_sta = 1
+                 AND b.usr_typ = 2
+                 AND ROWNUM = 1
+                 AND (b.usr_nbd + b.usr_wrk) =
+                        (SELECT   MIN (usr_nbd + usr_wrk)
+                           FROM   ops$asy.sec_usr a
+                          WHERE       a.cuo_cod = prm_key_cuo
+                                  AND a.sec_cod = ksec_cod
+                                  AND a.usr_sta = 1
+                                  AND a.usr_typ = 2);
+
+        paso := '5-' || kusr_ex2;
+
+        --- INSERT EN LA SAD_SPY
+        INSERT INTO ops$asy.sad_spy
+          VALUES   (prm_key_year,
                     prm_key_cuo,
                     prm_key_dec,
-                    prm_key_nber);
+                    prm_key_nber,
+                    '10',
+                    '76',
+                    prm_usuario,
+                    TRUNC (SYSDATE),
+                    TO_CHAR (SYSDATE, 'hh24:mi:ss'),
+                    kclr,
+                    ksec_cod,
+                    kusr_ex1,
+                    kusr_ex2,
+                    '0',
+                    '0',
+                    NULL,
+                    -1);
 
-        v_res := 0;
-        RETURN v_res;
+        ---- DESCUENTO DE LA CARGA DE TRABAJO ----------
+        paso := '6-';
+
+        SELECT   dec_wgt, itm_wgt
+          INTO   desc1, desc2
+          FROM   ops$asy.sel_prm
+         WHERE   cuo_cod = prm_key_cuo AND sel_flw = 1;
+
+        paso := '7-' || desc1 || '-' || desc2;
+
+        UPDATE   ops$asy.sec_usr a
+           SET   a.usr_wrk = usr_wrk + (desc1 + desc2 * citems),
+                 a.usr_nbd = usr_nbd + 1,
+                 a.usr_wrn = 1
+         WHERE       a.cuo_cod = prm_key_cuo
+                 AND a.sec_cod = ksec_cod
+                 AND a.usr_nam = kusr_ex1;
+
+        paso := '8-';
+
+        UPDATE   ops$asy.sec_usr a
+           SET   a.usr_wrk = usr_wrk + (desc1 + desc2 * citems),
+                 a.usr_nbd = usr_nbd + 1,
+                 a.usr_wrn = 1
+         WHERE       a.cuo_cod = prm_key_cuo
+                 AND a.sec_cod = ksec_cod
+                 AND a.usr_nam = kusr_ex2;
+
+
+        paso := '9-';
+
+
+        --ASIGNA TECNICO DE ADUANA
+        INSERT INTO tra_pastogrande
+          VALUES   (prm_key_year,
+                    prm_key_cuo,
+                    prm_key_dec,
+                    prm_key_nber,
+                    'SORTEA TECNICO ANALISTA',
+                    kusr_ex1,
+                    prm_usuario,
+                    SYSDATE);
+
+        COMMIT;
+        RETURN kusr_ex1;
+    EXCEPTION
+        WHEN OTHERS
+        THEN
+            ROLLBACK;
+
+            INSERT INTO tra_pastogrande
+              VALUES   (prm_key_year,
+                        prm_key_cuo,
+                        prm_key_dec,
+                        prm_key_nber,
+                        'SORTEA TECNICO ANALISTA',
+                        'ERROR-' || paso,
+                        prm_usuario,
+                        SYSDATE);
+
+            COMMIT;
+            RETURN 1;
     END;
 
     FUNCTION verifica_pastogrande (prm_car_reg_year   IN VARCHAR2,
