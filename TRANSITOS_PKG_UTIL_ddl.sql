@@ -63,7 +63,7 @@ END;
 
 CREATE OR REPLACE 
 PACKAGE BODY pkg_util
-/* Formatted on 29/09/2017 17:15:14 (QP5 v5.126) */
+/* Formatted on 10-oct.-2017 18:24:13 (QP5 v5.126) */
 IS
     FUNCTION programacion_aforo (prm_key_year     IN VARCHAR2,
                                  prm_key_cuo      IN VARCHAR2,
@@ -109,12 +109,12 @@ IS
         res     VARCHAR2 (300);
     BEGIN
         --Proceso MIRA para comparacion de precios.
-        res :=
+        /*res :=
             mira.pkg_analista.ver_dui_dav (prm_key_year,
                                            prm_key_cuo,
                                            prm_key_dec,
                                            prm_key_nber,
-                                           prm_usuario);
+                                           prm_usuario);*/
 
         INSERT INTO tra_pastogrande
           VALUES   (prm_key_year,
@@ -344,7 +344,7 @@ IS
                  AND key_dec = prm_key_dec
                  AND key_nber = prm_key_nber
                  AND spy_sta = '10'
-                 AND spy_act = '76';
+                 AND spy_act = '77';
 
         paso := '3-' || acant;
 
@@ -398,7 +398,7 @@ IS
                     prm_key_dec,
                     prm_key_nber,
                     '10',
-                    '76',
+                    '77',
                     prm_usuario,
                     TRUNC (SYSDATE),
                     TO_CHAR (SYSDATE, 'hh24:mi:ss'),
@@ -449,7 +449,7 @@ IS
                     prm_key_cuo,
                     prm_key_dec,
                     prm_key_nber,
-                    'SORTEA TECNICO ANALISTA',
+                    'SORTEA TECNICO AFORADOR',
                     kusr_ex1,
                     prm_usuario,
                     SYSDATE);
@@ -466,7 +466,7 @@ IS
                         prm_key_cuo,
                         prm_key_dec,
                         prm_key_nber,
-                        'SORTEA TECNICO ANALISTA',
+                        'SORTEA TECNICO AFORADOR',
                         'ERROR-' || paso,
                         prm_usuario,
                         SYSDATE);
@@ -517,16 +517,95 @@ IS
                      AND a.key_voy_nber = b.key_voy_nber
                      AND a.key_dep_date = b.key_dep_date)
         LOOP
-            SELECT   INSTR (i.carbol_shp_mark5,
-                            '&',
-                            1,
-                            3)
-              INTO   existe
-              FROM   DUAL;
+            SELECT   INSTR (i.carbol_shp_mark5, '&C&', 1) INTO existe FROM DUAL;
 
             IF existe = 0
             THEN
-                sw := 1;
+                SELECT   INSTR (i.carbol_shp_mark5,
+                                '/',
+                                1,
+                                3)
+                  INTO   existe
+                  FROM   DUAL;
+
+                IF existe > 0
+                THEN
+                    SELECT   SUBSTR (i.carbol_shp_mark5,
+                                     1,
+                                     INSTR (i.carbol_shp_mark5, '/') - 1),
+                             SUBSTR (i.carbol_shp_mark5,
+                                     INSTR (i.carbol_shp_mark5,
+                                            '/',
+                                            1,
+                                            1)
+                                     + 1,
+                                       INSTR (i.carbol_shp_mark5,
+                                              '/',
+                                              1,
+                                              2)
+                                     - INSTR (i.carbol_shp_mark5,
+                                              '/',
+                                              1,
+                                              1)
+                                     - 1),
+                             SUBSTR (i.carbol_shp_mark5,
+                                     INSTR (i.carbol_shp_mark5,
+                                            '/',
+                                            1,
+                                            2)
+                                     + 1,
+                                       INSTR (i.carbol_shp_mark5,
+                                              '/',
+                                              1,
+                                              3)
+                                     - INSTR (i.carbol_shp_mark5,
+                                              '/',
+                                              1,
+                                              2)
+                                     - 1),
+                             SUBSTR (i.carbol_shp_mark5,
+                                     INSTR (i.carbol_shp_mark5,
+                                            '/',
+                                            1,
+                                            3)
+                                     + 1,
+                                     LENGTH (i.carbol_shp_mark5)
+                                     - INSTR (i.carbol_shp_mark5,
+                                              '/',
+                                              1,
+                                              3))
+                      INTO   v_keyyear,
+                             v_keycuo,
+                             v_keydec,
+                             v_keynber
+                      FROM   DUAL;
+
+                    IF v_keydec IS NULL
+                    THEN
+                        SELECT   COUNT (1)
+                          INTO   existe
+                          FROM   ops$asy.sad_gen g
+                         WHERE       g.key_year = v_keyyear
+                                 AND g.key_cuo = v_keycuo
+                                 AND g.key_dec = NULL
+                                 AND g.key_nber = v_keynber
+                                 AND g.sad_num = 0;
+                    ELSE
+                        SELECT   COUNT (1)
+                          INTO   existe
+                          FROM   ops$asy.sad_gen g
+                         WHERE       g.key_year = v_keyyear
+                                 AND g.key_cuo = v_keycuo
+                                 AND g.key_dec = v_keydec
+                                 AND g.key_nber = v_keynber
+                                 AND g.sad_num = 0;
+                    END IF;
+
+                    IF existe > 0
+                    THEN
+                        sw := sw + 1;
+                    END IF;
+                END IF;
             ELSE
                 SELECT   SUBSTR (i.carbol_shp_mark5,
                                  1,
@@ -578,35 +657,24 @@ IS
                          v_keynber
                   FROM   DUAL;
 
-                IF v_keydec IS NULL
-                THEN
-                    SELECT   COUNT (1)
-                      INTO   existe
-                      FROM   ops$asy.sad_gen g
-                     WHERE       g.key_year = v_keyyear
-                             AND g.key_cuo = v_keycuo
-                             AND g.key_dec = NULL
-                             AND g.key_nber = v_keynber
-                             AND g.sad_num = 0;
-                ELSE
-                    SELECT   COUNT (1)
-                      INTO   existe
-                      FROM   ops$asy.sad_gen g
-                     WHERE       g.key_year = v_keyyear
-                             AND g.key_cuo = v_keycuo
-                             AND g.key_dec = v_keydec
-                             AND g.key_nber = v_keynber
-                             AND g.sad_num = 0;
-                END IF;
 
-                IF existe = 0
+                SELECT   COUNT (1)
+                  INTO   existe
+                  FROM   ops$asy.sad_gen g
+                 WHERE       g.sad_reg_year = v_keyyear
+                         AND g.key_cuo = v_keycuo
+                         AND g.sad_reg_serial = v_keydec
+                         AND g.sad_reg_nber = v_keynber
+                         AND g.sad_num = 0;
+
+                IF existe > 0
                 THEN
-                    sw := 1;
+                    sw := sw + 1;
                 END IF;
             END IF;
         END LOOP;
 
-        IF sw = 1
+        IF sw = 0
         THEN
             RETURN 2;
         END IF;
@@ -625,46 +693,46 @@ IS
             SELECT   DISTINCT
                      SUBSTR (b.carbol_shp_mark5,
                              1,
-                             INSTR (b.carbol_shp_mark5, '&') - 1),
+                             INSTR (b.carbol_shp_mark5, '/') - 1),
                      SUBSTR (b.carbol_shp_mark5,
                              INSTR (b.carbol_shp_mark5,
-                                    '&',
+                                    '/',
                                     1,
                                     1)
                              + 1,
                                INSTR (b.carbol_shp_mark5,
-                                      '&',
+                                      '/',
                                       1,
                                       2)
                              - INSTR (b.carbol_shp_mark5,
-                                      '&',
+                                      '/',
                                       1,
                                       1)
                              - 1),
                      SUBSTR (b.carbol_shp_mark5,
                              INSTR (b.carbol_shp_mark5,
-                                    '&',
+                                    '/',
                                     1,
                                     2)
                              + 1,
                                INSTR (b.carbol_shp_mark5,
-                                      '&',
+                                      '/',
                                       1,
                                       3)
                              - INSTR (b.carbol_shp_mark5,
-                                      '&',
+                                      '/',
                                       1,
                                       2)
                              - 1),
                      SUBSTR (b.carbol_shp_mark5,
                              INSTR (b.carbol_shp_mark5,
-                                    '&',
+                                    '/',
                                     1,
                                     3)
                              + 1,
                              LENGTH (b.carbol_shp_mark5)
                              - INSTR (b.carbol_shp_mark5,
-                                      '&',
+                                      '/',
                                       1,
                                       3))
               FROM   ops$asy.car_gen a, ops$asy.car_bol_gen b
