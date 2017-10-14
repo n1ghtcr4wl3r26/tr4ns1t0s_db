@@ -42,6 +42,11 @@ IS
                            prm_car_reg_nber   IN VARCHAR2)
         RETURN cursortype;
 
+    FUNCTION devuelve_campo5to(prm_car_reg_year   IN VARCHAR2,
+                           prm_key_cuo        IN VARCHAR2,
+                           prm_car_reg_nber   IN VARCHAR2)
+        RETURN cursortype;
+
     FUNCTION test_sleep (in_time IN NUMBER)
         RETURN INTEGER;
 
@@ -745,6 +750,28 @@ IS
 
         RETURN cr;
     END;
+
+    FUNCTION devuelve_campo5to(prm_car_reg_year   IN VARCHAR2,
+                           prm_key_cuo        IN VARCHAR2,
+                           prm_car_reg_nber   IN VARCHAR2)
+        RETURN cursortype
+    IS
+        cr   cursortype;
+    BEGIN
+        OPEN cr FOR
+            SELECT   DISTINCT
+                     b.carbol_shp_mark5
+              FROM   ops$asy.car_gen a, ops$asy.car_bol_gen b
+             WHERE       a.car_reg_year = prm_car_reg_year
+                     AND a.key_cuo = prm_key_cuo
+                     AND a.car_reg_nber = prm_car_reg_nber
+                     AND a.key_cuo = b.key_cuo
+                     AND a.key_voy_nber = b.key_voy_nber
+                     AND a.key_dep_date = b.key_dep_date;
+
+        RETURN cr;
+    END;
+
 
     FUNCTION test_sleep (in_time IN NUMBER)
         RETURN INTEGER
